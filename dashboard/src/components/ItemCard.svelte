@@ -75,9 +75,14 @@
       </span>
     </button>
     {#if inbox && !open}
-      <button class="approve" disabled={busy} onclick={() => run(() => api.update(item.id, { reviewed: true }))} title="Keep the AI's sorting and take it out of the inbox">
-        ✓ Approve
-      </button>
+      {#if item.status === "inbox"}
+        <!-- Nothing to approve yet: it still needs a list. Approving would hide it in Everything. -->
+        <button class="approve sort" onclick={onToggle} title="Choose where this goes">Sort…</button>
+      {:else}
+        <button class="approve" disabled={busy} onclick={() => run(() => api.update(item.id, { reviewed: true }))} title="Keep the AI's sorting and take it out of the inbox">
+          ✓ Approve
+        </button>
+      {/if}
     {/if}
   </div>
 
@@ -103,4 +108,5 @@
   .chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
   .chips:empty { display: none; }
   .approve { flex: none; font-size: 0.85rem; color: var(--ok); }
+  .approve.sort { color: var(--accent); }
 </style>

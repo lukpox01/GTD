@@ -1,5 +1,5 @@
 import { getItem, setStatusReviewed, type ItemStatus } from "../db/items";
-import { convertItemToProject } from "../db/projects";
+import { convertItemToProject, projectName } from "../db/projects";
 import type { Deps } from "../deps";
 import { formatItemMessage, itemKeyboard, parseCallbackData, type CallbackAction } from "./format";
 import type { TgCallbackQuery } from "./types";
@@ -42,7 +42,7 @@ export async function handleCallback(deps: Deps, query: TgCallbackQuery): Promis
     await deps.telegram.editMessageText(
       query.message.chat.id,
       query.message.message_id,
-      formatItemMessage(item),
+      formatItemMessage(item, await projectName(deps.db, item.project_id)),
       itemKeyboard(itemId),
     );
   }

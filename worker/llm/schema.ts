@@ -47,6 +47,8 @@ export const classifiedItemSchema = z.object({
   steps_count: optional(z.number().int().min(1).max(1000)),
   suggested_priority: optional(z.enum(PRIORITIES)),
   due_date: optional(isoDate),
+  /** One of the active project ids given in the prompt; checked against that list by the pipeline. */
+  project_id: optional(z.number().int().positive()),
   confidence: z.number().min(0).max(1).catch(0),
 });
 
@@ -84,6 +86,11 @@ export const vertexResponseSchema = {
       nullable: true,
       description: "YYYY-MM-DD, ONLY if the note explicitly states a deadline or date. Otherwise null.",
     },
+    project_id: {
+      type: "INTEGER",
+      nullable: true,
+      description: "Id of the listed active project this note clearly belongs to. null if none fits or none are listed.",
+    },
     confidence: { type: "NUMBER", description: "0..1, how confident you are in this classification." },
   },
   required: ["language", "transcript", "title", "next_action", "type", "status", "confidence"],
@@ -101,6 +108,7 @@ export const vertexResponseSchema = {
     "steps_count",
     "suggested_priority",
     "due_date",
+    "project_id",
     "confidence",
   ],
 } as const;

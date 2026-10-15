@@ -2,6 +2,7 @@ import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getItem } from "../worker/db/items";
 import { ClassificationError } from "../worker/llm/types";
+import { classifyInto } from "../worker/pipeline/process";
 import { handleUpdate } from "../worker/telegram/webhook";
 import { FakeProvider, classified, makeDeps, resetDb, textUpdate, voiceUpdate } from "./helpers";
 
@@ -133,5 +134,56 @@ describe("voice note", () => {
     const item = await onlyItem();
     expect(item).toMatchObject({ transcript: "kúpiť mlieko", needs_review: 1, status: "inbox" });
     expect(item.telegram_file_id).toBeTruthy(); // can be re-processed later
+  });
+});
+
+describe("project assignment", () => {
+  async function project(name: string, status = "active") {
+    const row = await env.DB.prepare("INSERT INTO projects (name, status) VALUES (?, ?) RETURNING id")
+      .bind(name, status)
+      .first<{ id: number }>();
+    return row!.id;
+  }
+
+  it("offers the active projects and files the note under the one the AI picks", async () => {
+    const ukulele = await project("Ukulele");
+    await project("Old thing", "done");
+    const provider = new FakeProvider((input) => ({
+      item: classified({ title: "Learn Riptide", project_id: input.projects?.[0]?.id ?? null }),
+      model: "m",
+    }));
+    const deps = makeDeps(provider);
+
+    await handleUpdate(deps, textUpdate("naučiť sa Riptide na ukulele"));
+
+    expect(provider.inputs[0]?.projects).toEqual([{ id: ukulele, name: "Ukulele", outcome: null }]);
+    const item = await onlyItem();
+    expect(item.project_id).toBe(ukulele);
+    expect(deps.telegram.sent[0]?.text).toContain("🗂 Ukulele");
+  });
+
+  it("drops a project id the AI made up", async () => {
+    await project("Ukulele");
+    const deps = makeDeps(new FakeProvider(() => ({ item: classified({ project_id: 9999 }), model: "m" })));
+    await handleUpdate(deps, textUpdate("buy milk"));
+    expect((await onlyItem()).project_id).toBeNull();
+  });
+
+  it("sends no project list when there are none", async () => {
+    const provider = new FakeProvider(() => ({ item: classified(), model: "m" }));
+    await handleUpdate(makeDeps(provider), textUpdate("buy milk"));
+    expect(provider.inputs[0]).toEqual({ text: "buy milk" });
+  });
+
+  it("keeps a project the user already chose when the note is re-sorted", async () => {
+    const mine = await project("Mine");
+    const other = await project("Other");
+    const deps = makeDeps(new FakeProvider(() => ({ item: classified({ project_id: other }), model: "m" })));
+    await handleUpdate(deps, textUpdate("note"));
+    const item = await onlyItem();
+    await env.DB.prepare("UPDATE items SET project_id = ? WHERE id = ?").bind(mine, item.id).run();
+
+    await classifyInto(deps, item.id, { kind: "text", text: "note" }, []);
+    expect((await getItem(env.DB, item.id))?.project_id).toBe(mine);
   });
 });

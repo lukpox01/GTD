@@ -41,7 +41,8 @@ move processing to Cloudflare Queues (the raw row is already saved, so nothing i
   `POST /items {text, classify?}` (capture + classify synchronously, no bot reply),
   `GET|PATCH|DELETE /items/:id`, `POST /items/:id/reclassify`, `GET|POST /projects`, `PATCH /projects/:id`.
   Bodies are validated with zod (`.strict()`, unknown fields → 400).
-- Views: `inbox` = the review queue (`reviewed_at IS NULL`, not done/deleted, same as the bot's `/inbox`);
+- Views: `inbox` = the review queue (`reviewed_at IS NULL` **or** `status='inbox'`, not done/deleted; the bot's
+  `/inbox` uses the same rule, so an approved-but-unsorted note never drops out of every list);
   `next|waiting|scheduled|someday|done|deleted` = that status; `all` = everything but deleted.
 - `PATCH` with a `status` marks the item reviewed (like a bot button); `reviewed: true|false` approves
   or sends it back to the inbox. `DELETE` is the soft delete; restore = `PATCH {status}`.
@@ -64,7 +65,10 @@ API and UI share one definition. Hash routes: `#/inbox`, `#/next`, …, `#/proje
 - `schema.ts` — zod `classifiedItemSchema` (source of truth) + Vertex `responseSchema`
   (kept in sync by a test) + `parseClassification` (never throws). Optional fields that are
   invalid become `null` instead of failing the whole note; `title` and `type` are required.
-- `prompt.ts` — system prompt + user prompt with today's date in `TIMEZONE`.
+- `prompt.ts` — system prompt + user prompt with today's date in `TIMEZONE` and the active projects
+  (`id: name — outcome`, up to 100). The model may return `project_id` for one of them; `classifyInto`
+  drops any id it wasn't offered, and `saveClassification` only fills `project_id` when it is empty
+  (a project the user chose wins, also on reclassify).
 - `gemini-vertex.ts` — `generateContent` with `responseMimeType: application/json` + `responseSchema`,
   `thinkingConfig.thinkingLevel` from `GEMINI_THINKING_LEVEL` (default `low`; `minimal` is rejected by gemini-3.8-flash).
   Voice is sent as `inlineData` (`audio/ogg`); transcription + classification is ONE call.

@@ -63,6 +63,7 @@ export function classified(overrides: Partial<ClassifiedItem> = {}): ClassifiedI
     steps_count: 1,
     suggested_priority: "medium",
     due_date: null,
+    project_id: null,
     confidence: 0.9,
     ...overrides,
   };

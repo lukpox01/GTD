@@ -100,7 +100,8 @@ export async function saveClassification(
       `UPDATE items SET
          transcript = COALESCE(?, transcript), title = ?, next_action = ?, notes = ?, type = ?, status = ?,
          context = ?, time_estimate_min = ?, energy = ?, steps_count = ?, suggested_priority = ?,
-         due_date = ?, ai_confidence = ?, ai_model = ?, language = ?, needs_review = 0,
+         due_date = ?, project_id = COALESCE(project_id, ?), ai_confidence = ?, ai_model = ?, language = ?,
+         needs_review = 0,
          pipeline_log = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
        WHERE id = ?`,
     )
@@ -117,6 +118,7 @@ export async function saveClassification(
       c.steps_count,
       c.suggested_priority,
       c.due_date,
+      c.project_id,
       c.confidence,
       model,
       c.language,
@@ -165,10 +167,11 @@ export async function setStatusReviewed(db: D1Database, id: number, status: Item
     .run();
 }
 
+/** The bot's /inbox: same queue as the dashboard inbox. */
 export async function listUnreviewed(db: D1Database, limit = 20): Promise<Item[]> {
   const { results } = await db
     .prepare(
-      `SELECT * FROM items WHERE reviewed_at IS NULL AND status NOT IN ('done', 'deleted')
+      `SELECT * FROM items WHERE (reviewed_at IS NULL OR status = 'inbox') AND status NOT IN ('done', 'deleted')
        ORDER BY created_at ASC, id ASC LIMIT ?`,
     )
     .bind(limit)
@@ -190,7 +193,7 @@ export async function listQuickNextActions(db: D1Database, maxMinutes = 15, limi
   return results.map(decode);
 }
 
-/** Dashboard list views. `inbox` is the review queue (unreviewed, like the bot's /inbox), the rest are statuses. */
+/** Dashboard list views. `inbox` is the review queue (unreviewed or still status 'inbox'), the rest are statuses. */
 export const ITEM_VIEWS = ["inbox", "next", "waiting", "scheduled", "someday", "done", "deleted", "all"] as const;
 export type ItemView = (typeof ITEM_VIEWS)[number];
 
@@ -204,6 +207,8 @@ export interface ItemQuery {
 }
 
 const OPEN = `status NOT IN ('done', 'deleted')`;
+/** Needs processing: never reviewed, or reviewed but not sorted out of status 'inbox' yet. */
+const IN_INBOX = `(reviewed_at IS NULL OR status = 'inbox') AND ${OPEN}`;
 const BY_PRIORITY = `(priority IS NULL), CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END`;
 
 export async function listItems(db: D1Database, query: ItemQuery): Promise<Item[]> {
@@ -213,7 +218,7 @@ export async function listItems(db: D1Database, query: ItemQuery): Promise<Item[
 
   switch (query.view) {
     case "inbox":
-      where.push(`reviewed_at IS NULL AND ${OPEN}`);
+      where.push(IN_INBOX);
       order = "created_at ASC, id ASC";
       break;
     case "all":
@@ -258,7 +263,7 @@ export async function countItems(db: D1Database): Promise<Record<ItemView | "nee
   const row = await db
     .prepare(
       `SELECT
-         SUM(reviewed_at IS NULL AND ${OPEN}) AS inbox,
+         SUM(${IN_INBOX}) AS inbox,
          SUM(status = 'next') AS next, SUM(status = 'waiting') AS waiting,
          SUM(status = 'scheduled') AS scheduled, SUM(status = 'someday') AS someday,
          SUM(status = 'done') AS done, SUM(status = 'deleted') AS deleted,

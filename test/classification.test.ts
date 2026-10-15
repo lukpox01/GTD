@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildUserPrompt } from "../worker/llm/prompt";
 import { classifiedItemSchema, parseClassification, vertexResponseSchema } from "../worker/llm/schema";
 
 const valid = {
@@ -104,5 +105,36 @@ describe("vertexResponseSchema", () => {
     expect(Object.keys(vertexResponseSchema.properties).sort()).toEqual(zodKeys);
     expect([...vertexResponseSchema.propertyOrdering].sort()).toEqual(zodKeys);
     for (const key of vertexResponseSchema.required) expect(zodKeys).toContain(key);
+  });
+});
+
+describe("buildUserPrompt", () => {
+  const now = new Date("2026-10-15T10:00:00Z");
+
+  it("lists active projects with their outcome", () => {
+    const prompt = buildUserPrompt({
+      now,
+      timezone: "Europe/Bratislava",
+      text: "learn Riptide",
+      hasAudio: false,
+      projects: [
+        { id: 3, name: "Ukulele", outcome: "Play 10 songs" },
+        { id: 7, name: "Thesis", outcome: null },
+      ],
+    });
+    expect(prompt).toContain("- 3: Ukulele — Play 10 songs\n- 7: Thesis\n");
+  });
+
+  it("leaves the project section out when there are none", () => {
+    expect(buildUserPrompt({ now, timezone: "UTC", text: "x", hasAudio: false })).not.toContain("projects");
+  });
+});
+
+describe("project_id", () => {
+  it("is optional and drops non-ids", () => {
+    const ok = parseClassification(JSON.stringify({ ...valid, project_id: 3 }));
+    expect(ok.ok && ok.item.project_id).toBe(3);
+    const bad = parseClassification(JSON.stringify({ ...valid, project_id: "Ukulele" }));
+    expect(bad.ok && bad.item.project_id).toBeNull();
   });
 });

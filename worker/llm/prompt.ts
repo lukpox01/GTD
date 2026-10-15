@@ -28,6 +28,10 @@ Rules:
 - due_date: ONLY when the note explicitly states a deadline or date ("do piatku", "by Friday",
   "15. novembra"). Resolve relative dates against today's date given below and output YYYY-MM-DD.
   NEVER invent or guess a deadline. If none is stated, due_date is null.
+- project_id: if active projects are listed below the date, and the note clearly belongs to one of
+  them (it is a step, idea, resource or practice item for that project, e.g. a new song to learn
+  for "Ukulele"), set its id. Match by meaning, not only exact words, and across languages.
+  null when unsure or when nothing fits. Never invent an id that is not listed.
 - confidence: 0..1, how sure you are about type/next_action.
 - Do not add facts that are not in the note.
 
@@ -37,9 +41,25 @@ transcript. For text input set "transcript" to null.
 
 Return only the JSON object described by the response schema.`;
 
-export function buildUserPrompt(opts: { now: Date; timezone: string; text?: string; hasAudio: boolean }): string {
+export interface PromptProject {
+  id: number;
+  name: string;
+  outcome: string | null;
+}
+
+export function buildUserPrompt(opts: {
+  now: Date;
+  timezone: string;
+  text?: string;
+  hasAudio: boolean;
+  projects?: PromptProject[];
+}): string {
   const today = formatToday(opts.now, opts.timezone);
   const lines = [`Today is ${today} (timezone ${opts.timezone}).`];
+  if (opts.projects?.length) {
+    lines.push("", "Active projects (id: name — desired outcome):");
+    for (const p of opts.projects) lines.push(`- ${p.id}: ${p.name}${p.outcome ? ` — ${p.outcome}` : ""}`);
+  }
   if (opts.hasAudio) lines.push("The note is the attached voice recording.");
   if (opts.text) lines.push("", "Note:", '"""', opts.text, '"""');
   return lines.join("\n");
