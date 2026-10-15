@@ -1,0 +1,10 @@
+# Copy to .dev.vars (gitignored) for `npm run dev`. Production uses `wrangler secret put`.
+TELEGRAM_BOT_TOKEN=123456789:AA...
+# Any random string (A-Z, a-z, 0-9, _ and -, 1-256 chars). Generate: openssl rand -hex 32
+TELEGRAM_WEBHOOK_SECRET=change-me
+# Your own chat id with the bot (see README for how to find it)
+ALLOWED_CHAT_ID=123456789
+# The whole service-account key JSON on ONE line (see README)
+GCP_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"gtd-bot@your-project.iam.gserviceaccount.com","token_uri":"https://oauth2.googleapis.com/token"}
+GCP_PROJECT_ID=your-gcp-project
+# GCP_LOCATION, GEMINI_MODEL and TIMEZONE are vars in wrangler.jsonc; override here only if needed.
