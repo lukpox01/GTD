@@ -70,6 +70,11 @@ gcloud iam service-accounts keys create gtd-key.json \
   `wrangler.jsonc`. Check the current Flash model id in the
   [Vertex AI model list](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/model-versions)
   and update `GEMINI_MODEL` when Google retires it. New models are often available on `global` only.
+- `GEMINI_THINKING_LEVEL` (default `low`) caps how long Gemini 3 "thinks" before answering. With the
+  model default, gemini-3.8-flash spent ~200 thinking tokens and 3–7 s per note; `low` gave the same
+  result with no thinking tokens in ~2 s. `minimal` is rejected by gemini-3.8-flash (HTTP 400). Leave it
+  empty for models that don't accept it (Gemini 2.5 rejects any thinking level).
+  Each item's `pipeline_log` records the latency and token counts of its classification call.
 - `TIMEZONE` (default `Europe/Bratislava`) is used to resolve "by Friday"-style deadlines.
 
 ### 5. Production secrets

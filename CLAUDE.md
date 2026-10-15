@@ -37,7 +37,8 @@ move processing to Cloudflare Queues (the raw row is already saved, so nothing i
   (kept in sync by a test) + `parseClassification` (never throws). Optional fields that are
   invalid become `null` instead of failing the whole note; `title` and `type` are required.
 - `prompt.ts` — system prompt + user prompt with today's date in `TIMEZONE`.
-- `gemini-vertex.ts` — `generateContent` with `responseMimeType: application/json` + `responseSchema`.
+- `gemini-vertex.ts` — `generateContent` with `responseMimeType: application/json` + `responseSchema`,
+  `thinkingConfig.thinkingLevel` from `GEMINI_THINKING_LEVEL` (default `low`; `minimal` is rejected by gemini-3.8-flash).
   Voice is sent as `inlineData` (`audio/ogg`); transcription + classification is ONE call.
   Endpoint host is `aiplatform.googleapis.com` for `GCP_LOCATION=global`, else `{loc}-aiplatform…`.
 - `vertex-auth.ts` — service-account RS256 JWT via WebCrypto → OAuth token, cached per isolate
@@ -83,7 +84,7 @@ Delete is a soft delete (`status='deleted'`).
 
 Secrets (`wrangler secret put` / `.dev.vars`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
 `ALLOWED_CHAT_ID`, `GCP_SERVICE_ACCOUNT_JSON`, `GCP_PROJECT_ID`.
-Vars (`wrangler.jsonc`): `GCP_LOCATION`, `GEMINI_MODEL`, `TIMEZONE`. Types live in `worker/env.ts`.
+Vars (`wrangler.jsonc`): `GCP_LOCATION`, `GEMINI_MODEL`, `GEMINI_THINKING_LEVEL`, `TIMEZONE`. Types live in `worker/env.ts`.
 Never commit secrets; `.dev.vars` is gitignored.
 
 ## Commands

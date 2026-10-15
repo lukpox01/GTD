@@ -17,8 +17,8 @@
     {
       "binding": "DB",
       "database_name": "gtd",
-      // Replace with the id printed by `npx wrangler d1 create gtd` (see README, step 3).
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      // Production database (`npx wrangler d1 create gtd`, README step 3). Not a secret.
+      "database_id": "99bdad50-640d-4bde-86e9-1beeffa4ab5f",
       "migrations_dir": "migrations"
     }
   ],
@@ -28,6 +28,8 @@
   "vars": {
     "GCP_LOCATION": "global",
     "GEMINI_MODEL": "gemini-3.8-flash",
+    // Classification is simple; the model default thinks far longer than needed (slower, pricier).
+    "GEMINI_THINKING_LEVEL": "low",
     "TIMEZONE": "Europe/Bratislava"
   }
 }

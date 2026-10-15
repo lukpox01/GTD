@@ -23,6 +23,7 @@ export function createDeps(env: Env): Deps {
         projectId: env.GCP_PROJECT_ID,
         location: env.GCP_LOCATION,
         model: env.GEMINI_MODEL,
+        thinkingLevel: env.GEMINI_THINKING_LEVEL,
         timezone: env.TIMEZONE,
       })),
   };
