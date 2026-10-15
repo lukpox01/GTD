@@ -132,12 +132,13 @@ function vertexOk(text: string, extra: Record<string, unknown> = {}) {
   };
 }
 
-function provider(fetchFn: typeof fetch, location = "global") {
+function provider(fetchFn: typeof fetch, location = "global", thinkingLevel?: string) {
   return new GeminiVertexProvider({
     serviceAccount: sa,
     projectId: "my-proj",
     location,
     model: "gemini-3.8-flash",
+    thinkingLevel,
     timezone: "Europe/Bratislava",
     fetch: fetchFn,
     now: () => new Date("2026-10-15T10:00:00Z"),
@@ -168,6 +169,25 @@ describe("GeminiVertexProvider", () => {
     expect(req.generationConfig.responseSchema.properties.title).toBeDefined();
     expect(req.contents[0].parts[0].text).toContain("Thursday 2026-10-15");
     expect(req.contents[0].parts[0].text).toContain("email the prof");
+  });
+
+  it("sends the thinking level only when configured", async () => {
+    const { fn, calls } = fakeFetch([vertexOk(JSON.stringify(goodItem)), vertexOk(JSON.stringify(goodItem))]);
+    await provider(fn, "global", "low").classify({ text: "x" });
+    await provider(fn).classify({ text: "x" });
+    const bodies = calls.filter((c) => c.url.includes(":generateContent")).map((c) => JSON.parse(String(c.init?.body)));
+    expect(bodies[0].generationConfig.thinkingConfig).toEqual({ thinkingLevel: "low" });
+    expect(bodies[1].generationConfig.thinkingConfig).toBeUndefined();
+  });
+
+  it("returns token usage when Vertex reports it", async () => {
+    const { fn } = fakeFetch([
+      vertexOk(JSON.stringify(goodItem), {
+        usageMetadata: { promptTokenCount: 900, candidatesTokenCount: 80, thoughtsTokenCount: 12 },
+      }),
+    ]);
+    const result = await provider(fn).classify({ text: "x" });
+    expect(result.usage).toEqual({ input: 900, output: 80, thoughts: 12 });
   });
 
   it("sends audio as inline data", async () => {

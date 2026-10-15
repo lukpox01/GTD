@@ -28,6 +28,8 @@
   "vars": {
     "GCP_LOCATION": "global",
     "GEMINI_MODEL": "gemini-3.8-flash",
+    // Classification is simple; the model default thinks far longer than needed (slower, pricier).
+    "GEMINI_THINKING_LEVEL": "low",
     "TIMEZONE": "Europe/Bratislava"
   }
 }

@@ -38,9 +38,12 @@ export async function processNote(deps: Deps, message: TgMessage, note: Note): P
       input.audio = { bytes, mimeType: note.mimeType };
     }
 
-    const { item, model } = await deps.llm().classify(input);
+    const started = Date.now();
+    const { item, model, usage } = await deps.llm().classify(input);
+    const ms = Date.now() - started;
     if (note.kind === "voice") step("transcribed", { detail: `${item.transcript?.length ?? 0} chars` });
-    step("classified", { detail: `${model} · ${item.type} · confidence ${item.confidence}` });
+    const tokens = usage ? ` · tokens in ${usage.input} out ${usage.output} thinking ${usage.thoughts}` : "";
+    step("classified", { detail: `${model} · ${item.type} · confidence ${item.confidence} · ${ms} ms${tokens}` });
     step("saved");
     await saveClassification(deps.db, id, item, model, log);
   } catch (e) {

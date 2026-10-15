@@ -11,6 +11,8 @@ export interface ClassifyResult {
   item: ClassifiedItem;
   /** Model id that produced the result, stored in items.ai_model. */
   model: string;
+  /** Token counts reported by the provider, when available. */
+  usage?: { input: number; output: number; thoughts: number };
 }
 
 /**

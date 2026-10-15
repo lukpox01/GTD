@@ -11,5 +11,7 @@ export interface Env {
   // vars (wrangler.jsonc)
   GCP_LOCATION: string;
   GEMINI_MODEL: string;
+  /** Gemini 3 thinking level (e.g. "low"; gemini-3.8-flash rejects "minimal"); empty = model default. */
+  GEMINI_THINKING_LEVEL: string;
   TIMEZONE: string;
 }
