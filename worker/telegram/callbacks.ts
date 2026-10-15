@@ -25,15 +25,18 @@ export async function handleCallback(deps: Deps, query: TgCallbackQuery): Promis
   }
   const { action, itemId } = parsed;
 
+  // Check first: convertItemToProject throws on a missing item, which would leave the button spinning.
+  if (!(await getItem(deps.db, itemId))) {
+    await deps.telegram.answerCallbackQuery(query.id, `Item #${itemId} not found`);
+    return;
+  }
+
   const status = STATUS_FOR[action];
   if (status) await setStatusReviewed(deps.db, itemId, status);
   else if (action === "project") await convertItemToProject(deps.db, itemId);
 
   const item = await getItem(deps.db, itemId);
-  if (!item) {
-    await deps.telegram.answerCallbackQuery(query.id, `Item #${itemId} not found`);
-    return;
-  }
+  if (!item) return;
   await deps.telegram.answerCallbackQuery(query.id, TOAST[action]);
   if (query.message) {
     await deps.telegram.editMessageText(
