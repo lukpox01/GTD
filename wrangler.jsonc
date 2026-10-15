@@ -32,8 +32,8 @@
     "GEMINI_THINKING_LEVEL": "low",
     "TIMEZONE": "Europe/Bratislava",
     // Cloudflare Access for the dashboard API (README step 8). Not secrets. While either is empty,
-    // /api/* answers 503 everywhere except `wrangler dev` on localhost.
-    "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
+    // /api/* answers 503 everywhere except `wrangler dev` on localhost. AUD = the whole-site app, not the webhook bypass app.
+    "ACCESS_TEAM_DOMAIN": "lukpox01",
+    "ACCESS_AUD": "f09df2a500605f13001c48644c1d567d806e037ca2d75c1502343927cbd4ef4d"
   }
 }

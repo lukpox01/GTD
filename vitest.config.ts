@@ -16,6 +16,9 @@ export default defineConfig(async () => {
             ALLOWED_CHAT_ID: "4242",
             GCP_SERVICE_ACCOUNT_JSON: "{}",
             GCP_PROJECT_ID: "test-project",
+            // Tests that need Access configured pass their own env; the default is "not configured".
+            ACCESS_TEAM_DOMAIN: "",
+            ACCESS_AUD: "",
           },
         },
       }),
