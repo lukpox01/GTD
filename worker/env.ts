@@ -14,4 +14,8 @@ export interface Env {
   /** Gemini 3 thinking level (e.g. "low"; gemini-3.8-flash rejects "minimal"); empty = model default. */
   GEMINI_THINKING_LEVEL: string;
   TIMEZONE: string;
+  /** Cloudflare Access team, e.g. "myteam" or "myteam.cloudflareaccess.com". Empty = /api refuses all requests. */
+  ACCESS_TEAM_DOMAIN: string;
+  /** Application Audience (AUD) tag of the dashboard's Access application. */
+  ACCESS_AUD: string;
 }

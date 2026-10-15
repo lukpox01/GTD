@@ -103,3 +103,23 @@ export function callbackUpdate(data: string, messageId = 1000, chatId = ALLOWED_
     },
   };
 }
+
+/** An RSA key pair standing in for a Cloudflare Access team's signing key. */
+export async function makeAccessKey(kid = "test-kid") {
+  const pair = (await crypto.subtle.generateKey(
+    { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+    true,
+    ["sign", "verify"],
+  )) as CryptoKeyPair;
+  const jwk = { ...((await crypto.subtle.exportKey("jwk", pair.publicKey)) as JsonWebKey), kid };
+  const b64url = (bytes: Uint8Array) =>
+    btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const enc = (obj: unknown) => b64url(new TextEncoder().encode(JSON.stringify(obj)));
+
+  async function sign(payload: Record<string, unknown>, header: Record<string, unknown> = {}): Promise<string> {
+    const signingInput = `${enc({ alg: "RS256", kid, typ: "JWT", ...header })}.${enc(payload)}`;
+    const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", pair.privateKey, new TextEncoder().encode(signingInput));
+    return `${signingInput}.${b64url(new Uint8Array(sig))}`;
+  }
+  return { jwk, sign };
+}

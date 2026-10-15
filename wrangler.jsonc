@@ -5,10 +5,10 @@
   "compatibility_date": "2026-10-01",
   "observability": { "enabled": true },
 
-  // Dashboard SPA. Phase 1 ships a placeholder page; Phase 2 points this at the Vite build output.
+  // Dashboard SPA: the Vite build output (`npm run build`).
   // Requests to /api/* and /telegram/* always hit the Worker; everything else is served from assets.
   "assets": {
-    "directory": "./dashboard/public",
+    "directory": "./dashboard/dist",
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*", "/telegram/*"]
   },
@@ -30,6 +30,10 @@
     "GEMINI_MODEL": "gemini-3.8-flash",
     // Classification is simple; the model default thinks far longer than needed (slower, pricier).
     "GEMINI_THINKING_LEVEL": "low",
-    "TIMEZONE": "Europe/Bratislava"
+    "TIMEZONE": "Europe/Bratislava",
+    // Cloudflare Access for the dashboard API (README step 8). Not secrets. While either is empty,
+    // /api/* answers 503 everywhere except `wrangler dev` on localhost.
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
   }
 }
