@@ -45,9 +45,14 @@ export class GeminiVertexProvider implements LlmProvider {
   }
 
   buildRequest(input: ClassifyInput): unknown {
-    const parts: unknown[] = [
-      { text: buildUserPrompt({ now: this.now(), timezone: this.config.timezone, text: input.text, hasAudio: !!input.audio }) },
-    ];
+    const prompt = buildUserPrompt({
+      now: this.now(),
+      timezone: this.config.timezone,
+      text: input.text,
+      hasAudio: !!input.audio,
+      projects: input.projects,
+    });
+    const parts: unknown[] = [{ text: prompt }];
     if (input.audio) {
       parts.push({ inlineData: { mimeType: input.audio.mimeType, data: bytesToBase64(input.audio.bytes) } });
     }

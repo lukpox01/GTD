@@ -32,6 +32,24 @@ export async function listProjects(db: D1Database): Promise<ProjectWithCounts[]>
   return results;
 }
 
+/** Active projects for the classifier prompt, at most `limit` (most recently touched first). */
+export async function listActiveProjects(
+  db: D1Database,
+  limit = 100,
+): Promise<Array<{ id: number; name: string; outcome: string | null }>> {
+  const { results } = await db
+    .prepare(`SELECT id, name, outcome FROM projects WHERE status = 'active' ORDER BY updated_at DESC, id DESC LIMIT ?`)
+    .bind(limit)
+    .all<{ id: number; name: string; outcome: string | null }>();
+  return results;
+}
+
+export async function projectName(db: D1Database, id: number | null): Promise<string | null> {
+  if (id === null) return null;
+  const row = await db.prepare(`SELECT name FROM projects WHERE id = ?`).bind(id).first<{ name: string }>();
+  return row?.name ?? null;
+}
+
 export async function getProject(db: D1Database, id: number): Promise<Project | null> {
   return db.prepare(`SELECT * FROM projects WHERE id = ?`).bind(id).first<Project>();
 }

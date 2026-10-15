@@ -101,15 +101,18 @@ describe("auth", () => {
 });
 
 describe("GET /api/items", () => {
-  it("inbox is the unreviewed queue, oldest first", async () => {
+  it("inbox is the unreviewed queue plus anything still in status inbox, oldest first", async () => {
     const a = await seed("first");
     const b = await seed("second", { status: "next" });
     await env.DB.prepare("UPDATE items SET reviewed_at = NULL WHERE id = ?").bind(b).run();
-    await seed("reviewed", { reviewed: true });
+    // Approved while the AI left it in status 'inbox' (e.g. "hi"): it must not vanish from every list.
+    const c = await seed("approved but unsorted", { reviewed: true });
+    await seed("approved and sorted", { status: "next", reviewed: true });
     await seed("done", { status: "done" });
 
     const { json } = await call("GET", "/items?view=inbox");
-    expect(json.items.map((i) => i.id)).toEqual([a, b]);
+    expect(json.items.map((i) => i.id)).toEqual([a, b, c]);
+    expect((await call("GET", "/counts")).json.inbox).toBe(3);
   });
 
   it("filters by status view, project, context and search text", async () => {

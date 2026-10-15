@@ -1,3 +1,4 @@
+import type { PromptProject } from "./prompt";
 import type { ClassifiedItem } from "./schema";
 
 export type { ClassifiedItem };
@@ -5,6 +6,8 @@ export type { ClassifiedItem };
 export interface ClassifyInput {
   text?: string;
   audio?: { bytes: Uint8Array; mimeType: string };
+  /** The user's active projects, so the model can file the note under one of them. */
+  projects?: PromptProject[];
 }
 
 export interface ClassifyResult {

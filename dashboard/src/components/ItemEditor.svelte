@@ -182,9 +182,14 @@
   </div>
 
   <div class="actions">
-    {#if item.reviewed_at === null && item.status !== "deleted"}
-      <button class="primary" disabled={busy} onclick={() => save(true)}>{dirty ? "Save & approve" : "Approve"}</button>
+    {#if (item.reviewed_at === null || item.status === "inbox") && item.status !== "deleted"}
+      <button
+        class="primary"
+        disabled={busy || draft.status === "inbox"}
+        title={draft.status === "inbox" ? "Pick a status first, so it lands in a list" : undefined}
+        onclick={() => save(true)}>{dirty ? "Save & approve" : "Approve"}</button>
       <button disabled={busy || !dirty} onclick={() => save(false)}>Save</button>
+      {#if draft.status === "inbox"}<span class="muted hint">Pick a status to approve</span>{/if}
     {:else}
       <button class="primary" disabled={busy || !dirty} onclick={() => save(false)}>Save</button>
     {/if}
@@ -236,6 +241,7 @@
   .wide { grid-column: 1 / -1; }
   .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
   .spacer { flex: 1; }
+  .hint { font-size: 0.8rem; }
   .meta { font-size: 0.8rem; }
   .link { border: 0; background: none; padding: 0; color: var(--accent); font-size: inherit; }
   .log { margin: 0; padding-left: 1.25rem; font-size: 0.8rem; display: flex; flex-direction: column; gap: 0.25rem; overflow-wrap: anywhere; }

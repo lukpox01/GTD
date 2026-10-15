@@ -51,12 +51,12 @@ export function summaryLine(item: Item): string {
 }
 
 /** Full bot reply for a captured item. Re-rendered from the DB row after every button tap. */
-export function formatItemMessage(item: Item): string {
+export function formatItemMessage(item: Item, projectName?: string | null): string {
   const lines = [summaryLine(item)];
   if (item.needs_review) lines.push("⚠️ AI sorting failed — saved raw to your inbox.");
   if (item.next_action && item.next_action !== item.title) lines.push(`➡️ ${item.next_action}`);
   if (item.due_date) lines.push(`📅 due ${item.due_date}`);
-  if (item.project_id !== null) lines.push(`🗂 project #${item.project_id}`);
+  if (item.project_id !== null) lines.push(`🗂 ${projectName ?? `project #${item.project_id}`}`);
   if (item.source === "voice" && item.transcript) lines.push(`🎙 “${excerpt(item.transcript, 300)}”`);
   const status = STATUS_LINE[item.status];
   if (status && item.reviewed_at) lines.push("", status);

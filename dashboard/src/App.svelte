@@ -99,7 +99,7 @@
           (route.view === "all"
             ? item.status !== "deleted"
             : route.view === "inbox"
-              ? item.reviewed_at === null && item.status !== "done" && item.status !== "deleted"
+              ? (item.reviewed_at === null || item.status === "inbox") && item.status !== "done" && item.status !== "deleted"
               : item.status === route.view);
     items = belongs ? items.map((i) => (i.id === item.id ? item : i)) : items.filter((i) => i.id !== item.id);
     if (!belongs && openId === item.id) openId = null;

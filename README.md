@@ -166,11 +166,14 @@ To talk to your local bot from Telegram, expose it with a tunnel
 
 Open `https://gtd-inbox.<your-subdomain>.workers.dev` and sign in through Cloudflare Access.
 
-- **Inbox** is everything you haven't reviewed yet. **Approve** keeps the AI's sorting; open an item
+- **Inbox** is everything you haven't reviewed or sorted yet. **Approve** keeps the AI's sorting; notes
+  the AI couldn't place (status "inbox") show **Sort…** instead, because they need a list first. Open an item
   to fix its title, next action, status, project, context, priority, due date and so on.
   Notes the AI couldn't sort are flagged ⚠️ and have **Retry AI**.
 - **Next actions / Waiting for / Scheduled / Someday** are the GTD lists; tick the box to mark done.
 - **Projects** shows each project's open items and warns when an active one has no next action.
+  New notes that clearly belong to an active project (e.g. a new song for "Ukulele") are filed under it
+  automatically, by the bot and the dashboard alike.
 - You can capture notes from the box at the top of the inbox too; they go through the same AI.
 - Delete moves an item to **Trash**, where it can be restored.
 

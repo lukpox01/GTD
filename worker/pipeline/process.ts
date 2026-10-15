@@ -1,4 +1,5 @@
 import { getItem, insertItem, markNeedsReview, saveClassification, setBotMessageId, type PipelineLogEntry } from "../db/items";
+import { listActiveProjects, projectName } from "../db/projects";
 import type { Deps } from "../deps";
 import { ClassificationError, type ClassifyInput } from "../llm/types";
 import { formatItemMessage, itemKeyboard } from "../telegram/format";
@@ -40,7 +41,11 @@ export async function processNote(deps: Deps, message: TgMessage, note: Note): P
 
   const saved = await getItem(deps.db, id);
   if (saved) {
-    const sent = await deps.telegram.sendMessage(message.chat.id, formatItemMessage(saved), itemKeyboard(id));
+    const sent = await deps.telegram.sendMessage(
+      message.chat.id,
+      formatItemMessage(saved, await projectName(deps.db, saved.project_id)),
+      itemKeyboard(id),
+    );
     await setBotMessageId(deps.db, id, sent.message_id);
   }
   return id;
@@ -58,7 +63,8 @@ export async function classifyInto(
 ): Promise<void> {
   const step = stepper(log);
   try {
-    const input: ClassifyInput = {};
+    const projects = await listActiveProjects(deps.db);
+    const input: ClassifyInput = projects.length ? { projects } : {};
     if (source.kind === "text") {
       input.text = source.text;
     } else {
@@ -69,10 +75,13 @@ export async function classifyInto(
 
     const started = Date.now();
     const { item, model, usage } = await deps.llm().classify(input);
+    // Only an id we offered counts; anything else the model made up is dropped.
+    if (item.project_id !== null && !projects.some((p) => p.id === item.project_id)) item.project_id = null;
     const ms = Date.now() - started;
     if (source.kind === "voice") step("transcribed", { detail: `${item.transcript?.length ?? 0} chars` });
     const tokens = usage ? ` · tokens in ${usage.input} out ${usage.output} thinking ${usage.thoughts}` : "";
-    step("classified", { detail: `${model} · ${item.type} · confidence ${item.confidence} · ${ms} ms${tokens}` });
+    const project = item.project_id === null ? "" : ` · project ${item.project_id}`;
+    step("classified", { detail: `${model} · ${item.type}${project} · confidence ${item.confidence} · ${ms} ms${tokens}` });
     step("saved");
     await saveClassification(deps.db, id, item, model, log);
   } catch (e) {
