@@ -52,7 +52,12 @@ describe("callback buttons", () => {
     const deps = makeDeps(new FakeProvider(() => ({ item: classified(), model: "m" })));
     await handleUpdate(deps, callbackUpdate("explode:1"));
     await handleUpdate(deps, callbackUpdate("done:99999"));
-    expect(deps.telegram.answered.map((a) => a.text)).toEqual(["Unknown action", "Item #99999 not found"]);
+    await handleUpdate(deps, callbackUpdate("project:99999"));
+    expect(deps.telegram.answered.map((a) => a.text)).toEqual([
+      "Unknown action",
+      "Item #99999 not found",
+      "Item #99999 not found",
+    ]);
     expect(deps.telegram.edited).toHaveLength(0);
   });
 
