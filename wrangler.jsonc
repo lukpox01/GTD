@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gtd-inbox",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+
+  // Dashboard SPA. Phase 1 ships a placeholder page; Phase 2 points this at the Vite build output.
+  // Requests to /api/* and /telegram/* always hit the Worker; everything else is served from assets.
+  "assets": {
+    "directory": "./dashboard/public",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/telegram/*"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gtd",
+      // Replace with the id printed by `npx wrangler d1 create gtd` (see README, step 3).
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // Non-secret config. Secrets (TELEGRAM_*, ALLOWED_CHAT_ID, GCP_SERVICE_ACCOUNT_JSON, GCP_PROJECT_ID)
+  // are set with `wrangler secret put` in production and .dev.vars locally.
+  "vars": {
+    "GCP_LOCATION": "global",
+    "GEMINI_MODEL": "gemini-3.8-flash",
+    "TIMEZONE": "Europe/Bratislava"
+  }
+}
