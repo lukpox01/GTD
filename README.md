@@ -2,7 +2,7 @@
 
 Capture thoughts by sending text or voice messages (Slovak or English) to a Telegram bot.
 Gemini (via Vertex AI) turns each one into a structured GTD item stored in Cloudflare D1.
-A web dashboard (Phase 2) is for reviewing and managing items.
+A web dashboard, behind Cloudflare Access, is for reviewing and managing items.
 
 Architecture, data model and conventions are in [CLAUDE.md](CLAUDE.md).
 
@@ -70,6 +70,11 @@ gcloud iam service-accounts keys create gtd-key.json \
   `wrangler.jsonc`. Check the current Flash model id in the
   [Vertex AI model list](https://cloud.google.com/vertex-ai/generative-ai/docs/learn/model-versions)
   and update `GEMINI_MODEL` when Google retires it. New models are often available on `global` only.
+- `GEMINI_THINKING_LEVEL` (default `low`) caps how long Gemini 3 "thinks" before answering. With the
+  model default, gemini-3.8-flash spent ~200 thinking tokens and 3–7 s per note; `low` gave the same
+  result with no thinking tokens in ~2 s. `minimal` is rejected by gemini-3.8-flash (HTTP 400). Leave it
+  empty for models that don't accept it (Gemini 2.5 rejects any thinking level).
+  Each item's `pipeline_log` records the latency and token counts of its classification call.
 - `TIMEZONE` (default `Europe/Bratislava`) is used to resolve "by Friday"-style deadlines.
 
 ### 5. Production secrets
@@ -91,13 +96,13 @@ repository → pick this repo. Settings:
 
 | Setting         | Value                                                              |
 | --------------- | ------------------------------------------------------------------ |
-| Build command   | *(empty)*                                                          |
+| Build command   | `npm run build`                                                    |
 | Deploy command  | `npx wrangler d1 migrations apply DB --remote && npx wrangler deploy` |
 | Production branch | `main`                                                           |
 
-Every push to `main` applies new migrations, then deploys.
+Every push to `main` builds the dashboard, applies new migrations, then deploys.
 
-**Manual:** `npm run deploy` (same two steps).
+**Manual:** `npm run deploy` (build, migrations, deploy).
 
 ### 7. Register the webhook
 
@@ -117,7 +122,7 @@ curl "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \
   -d "{\"url\":\"https://gtd-inbox.<sub>.workers.dev/telegram/webhook\",\"secret_token\":\"$TELEGRAM_WEBHOOK_SECRET\",\"allowed_updates\":[\"message\",\"callback_query\"]}"
 ```
 
-### 8. Cloudflare Access (before Phase 2 ships)
+### 8. Cloudflare Access (protects the dashboard)
 
 Zero Trust → Access → Applications → Add a self-hosted application:
 
@@ -126,10 +131,21 @@ Zero Trust → Access → Applications → Add a self-hosted application:
   policy for Everyone, so Telegram can reach the webhook. The webhook is protected by the secret
   token header and the chat-id allow-list instead.
 
+Then tell the Worker which Access app to trust (it re-checks the Access token on every `/api`
+call, so a mistake in the Access setup can't expose your data). In `wrangler.jsonc` `vars`:
+
+- `ACCESS_TEAM_DOMAIN` — your team name, e.g. `myteam` (the `https://<team>.cloudflareaccess.com`
+  host, shown under Zero Trust → Settings).
+- `ACCESS_AUD` — the first application's **Application Audience (AUD) Tag** (application →
+  Overview / Basic information).
+
+Commit and deploy. Until both are set, the dashboard loads but its API answers 503.
+
 ## Local development
 
 ```sh
-npm run dev          # wrangler dev on http://localhost:8787
+npm run dev          # builds the dashboard, then wrangler dev on http://localhost:8787
+npm run dev:dashboard  # dashboard with hot reload on http://localhost:5173 (run `npm run dev` too)
 npm test             # vitest, runs inside the Workers runtime
 npm run typecheck
 ```
@@ -145,5 +161,17 @@ To talk to your local bot from Telegram, expose it with a tunnel
 - `/inbox` — items you haven't reviewed yet (tapping any button marks an item reviewed)
 - `/quick` — next actions that take ≤15 min
 - `/help`
+
+## Using the dashboard
+
+Open `https://gtd-inbox.<your-subdomain>.workers.dev` and sign in through Cloudflare Access.
+
+- **Inbox** is everything you haven't reviewed yet. **Approve** keeps the AI's sorting; open an item
+  to fix its title, next action, status, project, context, priority, due date and so on.
+  Notes the AI couldn't sort are flagged ⚠️ and have **Retry AI**.
+- **Next actions / Waiting for / Scheduled / Someday** are the GTD lists; tick the box to mark done.
+- **Projects** shows each project's open items and warns when an active one has no next action.
+- You can capture notes from the box at the top of the inbox too; they go through the same AI.
+- Delete moves an item to **Trash**, where it can be restored.
 
 If the AI step fails, the note is still saved, as an inbox item flagged ⚠️ for review.

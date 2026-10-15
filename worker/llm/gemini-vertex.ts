@@ -11,6 +11,8 @@ export interface GeminiVertexConfig {
   projectId: string;
   location: string;
   model: string;
+  /** Sent as thinkingConfig.thinkingLevel when set; empty leaves the model default. */
+  thinkingLevel?: string;
   timezone: string;
   fetch?: typeof fetch;
   now?: () => Date;
@@ -23,6 +25,7 @@ interface GenerateContentResponse {
   }>;
   promptFeedback?: { blockReason?: string };
   modelVersion?: string;
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number };
 }
 
 export class GeminiVertexProvider implements LlmProvider {
@@ -55,6 +58,7 @@ export class GeminiVertexProvider implements LlmProvider {
         responseMimeType: "application/json",
         responseSchema: vertexResponseSchema,
         maxOutputTokens: 8192,
+        ...(this.config.thinkingLevel ? { thinkingConfig: { thinkingLevel: this.config.thinkingLevel } } : {}),
       },
     };
   }
@@ -107,6 +111,10 @@ export class GeminiVertexProvider implements LlmProvider {
         partialTranscript: parsed.partialTranscript,
       });
     }
-    return { item: parsed.item, model: usedModel };
+    const u = data.usageMetadata;
+    const usage = u
+      ? { input: u.promptTokenCount ?? 0, output: u.candidatesTokenCount ?? 0, thoughts: u.thoughtsTokenCount ?? 0 }
+      : undefined;
+    return { item: parsed.item, model: usedModel, ...(usage ? { usage } : {}) };
   }
 }

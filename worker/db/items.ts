@@ -44,6 +44,10 @@ export interface Item {
   pipeline_log: PipelineLogEntry[];
 }
 
+export const ITEM_STATUSES = ["inbox", "next", "waiting", "scheduled", "someday", "done", "deleted"] as const;
+export const ITEM_TYPES = ["task", "project", "idea", "reference", "someday"] as const;
+export const LEVELS = ["high", "medium", "low"] as const;
+
 type ItemRow = Omit<Item, "pipeline_log"> & { pipeline_log: string };
 
 function decode(row: ItemRow): Item {
@@ -59,8 +63,8 @@ function decode(row: ItemRow): Item {
 export interface NewItem {
   source: ItemSource;
   raw_text: string | null;
-  telegram_chat_id: number;
-  telegram_message_id: number;
+  telegram_chat_id: number | null;
+  telegram_message_id: number | null;
   telegram_file_id: string | null;
   pipeline_log: PipelineLogEntry[];
 }
@@ -184,4 +188,165 @@ export async function listQuickNextActions(db: D1Database, maxMinutes = 15, limi
     .bind(maxMinutes, limit)
     .all<ItemRow>();
   return results.map(decode);
+}
+
+/** Dashboard list views. `inbox` is the review queue (unreviewed, like the bot's /inbox), the rest are statuses. */
+export const ITEM_VIEWS = ["inbox", "next", "waiting", "scheduled", "someday", "done", "deleted", "all"] as const;
+export type ItemView = (typeof ITEM_VIEWS)[number];
+
+export interface ItemQuery {
+  view: ItemView;
+  projectId?: number;
+  context?: string;
+  /** Case-insensitive substring over title, next action, notes and the raw note. */
+  q?: string;
+  limit?: number;
+}
+
+const OPEN = `status NOT IN ('done', 'deleted')`;
+const BY_PRIORITY = `(priority IS NULL), CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END`;
+
+export async function listItems(db: D1Database, query: ItemQuery): Promise<Item[]> {
+  const where: string[] = [];
+  const binds: unknown[] = [];
+  let order = `${BY_PRIORITY}, (due_date IS NULL), due_date ASC, created_at ASC, id ASC`;
+
+  switch (query.view) {
+    case "inbox":
+      where.push(`reviewed_at IS NULL AND ${OPEN}`);
+      order = "created_at ASC, id ASC";
+      break;
+    case "all":
+      where.push(`status != 'deleted'`);
+      order = "created_at DESC, id DESC";
+      break;
+    case "done":
+    case "deleted":
+      where.push("status = ?");
+      binds.push(query.view);
+      order = "updated_at DESC, id DESC";
+      break;
+    default:
+      where.push("status = ?");
+      binds.push(query.view);
+  }
+  if (query.projectId !== undefined) {
+    where.push("project_id = ?");
+    binds.push(query.projectId);
+  }
+  if (query.context) {
+    where.push("context = ?");
+    binds.push(query.context);
+  }
+  if (query.q) {
+    const like = `%${query.q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const cols = ["title", "next_action", "notes", "raw_text", "transcript"];
+    where.push(`(${cols.map((c) => `${c} LIKE ? ESCAPE '\\'`).join(" OR ")})`);
+    binds.push(...cols.map(() => like));
+  }
+  binds.push(Math.min(Math.max(query.limit ?? 200, 1), 500));
+
+  const { results } = await db
+    .prepare(`SELECT * FROM items WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ?`)
+    .bind(...binds)
+    .all<ItemRow>();
+  return results.map(decode);
+}
+
+/** Item counts per dashboard view, plus how many need attention because the AI failed. */
+export async function countItems(db: D1Database): Promise<Record<ItemView | "needs_review", number>> {
+  const row = await db
+    .prepare(
+      `SELECT
+         SUM(reviewed_at IS NULL AND ${OPEN}) AS inbox,
+         SUM(status = 'next') AS next, SUM(status = 'waiting') AS waiting,
+         SUM(status = 'scheduled') AS scheduled, SUM(status = 'someday') AS someday,
+         SUM(status = 'done') AS done, SUM(status = 'deleted') AS deleted,
+         SUM(status != 'deleted') AS "all",
+         SUM(needs_review = 1 AND ${OPEN}) AS needs_review
+       FROM items`,
+    )
+    .first<Record<string, number | null>>();
+  const n = (k: string) => row?.[k] ?? 0;
+  return {
+    inbox: n("inbox"),
+    next: n("next"),
+    waiting: n("waiting"),
+    scheduled: n("scheduled"),
+    someday: n("someday"),
+    done: n("done"),
+    deleted: n("deleted"),
+    all: n("all"),
+    needs_review: n("needs_review"),
+  };
+}
+
+export async function listContexts(db: D1Database): Promise<string[]> {
+  const { results } = await db
+    .prepare(`SELECT DISTINCT context FROM items WHERE context IS NOT NULL AND status != 'deleted' ORDER BY context`)
+    .all<{ context: string }>();
+  return results.map((r) => r.context);
+}
+
+/** Fields the user can edit from the dashboard. `undefined` = leave as is, `null` = clear. */
+export interface ItemPatch {
+  title?: string | null;
+  next_action?: string | null;
+  notes?: string | null;
+  type?: ItemType | null;
+  status?: ItemStatus;
+  project_id?: number | null;
+  context?: string | null;
+  time_estimate_min?: number | null;
+  energy?: "low" | "medium" | "high" | null;
+  priority?: "high" | "medium" | "low" | null;
+  due_date?: string | null;
+  /** true = approve (set reviewed_at if unset), false = back to the review queue. */
+  reviewed?: boolean;
+}
+
+const PATCH_COLUMNS = [
+  "title",
+  "next_action",
+  "notes",
+  "type",
+  "status",
+  "project_id",
+  "context",
+  "time_estimate_min",
+  "energy",
+  "priority",
+  "due_date",
+] as const satisfies ReadonlyArray<keyof ItemPatch & keyof Item>;
+
+/**
+ * Apply a user edit. A status change counts as reviewing the item (same as a bot button).
+ * Returns false if the item doesn't exist.
+ */
+export async function updateItem(db: D1Database, id: number, patch: ItemPatch): Promise<boolean> {
+  const sets: string[] = [];
+  const binds: unknown[] = [];
+  for (const col of PATCH_COLUMNS) {
+    if (patch[col] === undefined) continue;
+    sets.push(`${col} = ?`);
+    binds.push(patch[col]);
+  }
+  if (patch.reviewed === false) sets.push("reviewed_at = NULL");
+  else if (patch.reviewed === true || patch.status !== undefined) {
+    sets.push(`reviewed_at = COALESCE(reviewed_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`);
+  }
+  sets.push(`updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`);
+
+  const res = await db
+    .prepare(`UPDATE items SET ${sets.join(", ")} WHERE id = ?`)
+    .bind(...binds, id)
+    .run();
+  return res.meta.changes > 0;
+}
+
+export async function appendLog(db: D1Database, id: number, entry: PipelineLogEntry): Promise<PipelineLogEntry[]> {
+  const item = await getItem(db, id);
+  const log = [...(item?.pipeline_log ?? []), entry];
+  await db.prepare(`UPDATE items SET pipeline_log = ? WHERE id = ?`).bind(JSON.stringify(log), id).run();
+  return log;
 }

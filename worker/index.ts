@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { apiRoutes } from "./api/routes";
 import { createDeps, type Deps } from "./deps";
 import type { Env } from "./env";
 import { handleUpdate, isAllowedChat, verifySecretToken } from "./telegram/webhook";
@@ -32,9 +33,8 @@ export function createApp(makeDeps: (env: Env) => Deps = createDeps) {
     return c.text("ok");
   });
 
-  // Dashboard API (Phase 2). Protected by Cloudflare Access.
-  app.get("/api/health", (c) => c.json({ ok: true }));
-  app.all("/api/*", (c) => c.json({ error: "not found" }, 404));
+  // Dashboard API. Behind Cloudflare Access, and the Worker verifies the Access JWT too.
+  app.route("/api", apiRoutes(makeDeps));
 
   app.notFound((c) => c.text("not found", 404));
   return app;

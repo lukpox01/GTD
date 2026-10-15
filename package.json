@@ -3,10 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler d1 migrations apply DB --remote && wrangler deploy",
+    "dev": "npm run build && wrangler dev",
+    "dev:dashboard": "vite --config dashboard/vite.config.ts",
+    "build": "vite build --config dashboard/vite.config.ts",
+    "deploy": "npm run build && wrangler d1 migrations apply DB --remote && wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && svelte-check --tsconfig dashboard/tsconfig.json --fail-on-warnings",
     "test": "vitest run",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings worker/worker-configuration.d.ts",
     "set-webhook": "node scripts/set-webhook.mjs"
@@ -18,7 +20,11 @@
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.4.3",
     "@cloudflare/workers-types": "^5.20261015.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "svelte": "^5.57.2",
+    "svelte-check": "^4.7.6",
     "typescript": "~5.9",
+    "vite": "^8.3.4",
     "vitest": "^5.0.5",
     "wrangler": "^4.151.0"
   }

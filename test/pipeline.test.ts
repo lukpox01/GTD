@@ -17,7 +17,11 @@ async function onlyItem() {
 
 describe("text note", () => {
   it("classifies, saves all fields and replies with buttons", async () => {
-    const provider = new FakeProvider(() => ({ item: classified(), model: "gemini-test" }));
+    const provider = new FakeProvider(() => ({
+      item: classified(),
+      model: "gemini-test",
+      usage: { input: 900, output: 80, thoughts: 0 },
+    }));
     const deps = makeDeps(provider);
 
     await handleUpdate(deps, textUpdate("ehm treba napisat profesorovi"));
@@ -41,6 +45,7 @@ describe("text note", () => {
       bot_message_id: 1000,
     });
     expect(item.pipeline_log.map((e) => e.step)).toEqual(["received", "classified", "saved"]);
+    expect(item.pipeline_log[1]?.detail).toMatch(/ms · tokens in 900 out 80 thinking 0$/);
 
     const reply = deps.telegram.sent[0];
     expect(reply?.text).toContain("📌 Email the professor · 10 min · @pc · next");
